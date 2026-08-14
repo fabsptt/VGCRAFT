@@ -53,6 +53,18 @@
     els[id] = document.getElementById(id);
   });
 
+  function setStatus(msg, cls) {
+    if (!els.statusLine) return;
+    els.statusLine.textContent = msg;
+    els.statusLine.className = "status-line" + (cls ? " " + cls : "");
+  }
+
+  // rede de segurança: mostra qualquer erro na frase de estado em vez de falhar em silêncio
+  window.addEventListener("error", function (e) {
+    setStatus("Erro no site: " + (e.message || "desconhecido") + " (linha " + e.lineno + ")", "err");
+    if (els.refreshBtn) els.refreshBtn.disabled = false;
+  });
+
   var state = {
     tiers: new Set([4, 5]),
     category: "all",
@@ -152,58 +164,59 @@
   }
 
   function loadData() {
-    var ids = collectIds();
-    var priceTargets = ids.outIds.concat(ids.matIds);
-    var priceChunks = chunk(priceTargets, 180);
-    var wantVolume = els.fetchVolume.checked;
-    var historyChunks = wantVolume ? chunk(ids.baseIds, 150) : [];
+    try {
+      var ids = collectIds();
+      var priceTargets = ids.outIds.concat(ids.matIds);
+      var priceChunks = chunk(priceTargets, 180);
+      var wantVolume = els.fetchVolume.checked;
+      var historyChunks = wantVolume ? chunk(ids.baseIds, 150) : [];
 
-    els.refreshBtn.disabled = true;
-    setStatus("A pedir preços ao mercado (" + priceChunks.length + " pedidos" + (wantVolume ? " + " + historyChunks.length + " de histórico" : "") + ")…", "");
+      els.refreshBtn.disabled = true;
+      setStatus("A pedir preços ao mercado (" + priceChunks.length + " pedidos" + (wantVolume ? " + " + historyChunks.length + " de histórico" : "") + ")…", "");
 
-    var priceMap = {};
-    var volMap = {};
+      var priceMap = {};
+      var volMap = {};
 
-    var pricePromises = priceChunks.map(fetchPricesChunk);
-    var historyPromises = historyChunks.map(fetchHistoryChunk);
+      var pricePromises = priceChunks.map(fetchPricesChunk);
+      var historyPromises = historyChunks.map(fetchHistoryChunk);
 
-    return Promise.all(pricePromises).then(function (results) {
-      results.forEach(function (rows) {
-        (rows || []).forEach(function (row) {
-          if (!row.item_id) return;
-          if (!priceMap[row.item_id]) priceMap[row.item_id] = {};
-          priceMap[row.item_id][row.city] = row;
+      return Promise.all(pricePromises).then(function (results) {
+        results.forEach(function (rows) {
+          (rows || []).forEach(function (row) {
+            if (!row.item_id) return;
+            if (!priceMap[row.item_id]) priceMap[row.item_id] = {};
+            priceMap[row.item_id][row.city] = row;
+          });
         });
-      });
-      return Promise.all(historyPromises);
-    }).then(function (results) {
-      results.forEach(function (rows) {
-        (rows || []).forEach(function (row) {
-          var id = row.item_id;
-          var city = row.location;
-          if (!id || !city) return;
-          var total = 0;
-          (row.data || []).forEach(function (pt) { total += (pt.item_count || 0); });
-          if (!volMap[id]) volMap[id] = {};
-          volMap[id][city] = (volMap[id][city] || 0) + total;
+        return Promise.all(historyPromises);
+      }).then(function (results) {
+        results.forEach(function (rows) {
+          (rows || []).forEach(function (row) {
+            var id = row.item_id;
+            var city = row.location;
+            if (!id || !city) return;
+            var total = 0;
+            (row.data || []).forEach(function (pt) { total += (pt.item_count || 0); });
+            if (!volMap[id]) volMap[id] = {};
+            volMap[id][city] = (volMap[id][city] || 0) + total;
+          });
         });
+        state.priceMap = priceMap;
+        state.volMap = volMap;
+        state.lastFetch = new Date();
+        setStatus("Atualizado às " + state.lastFetch.toLocaleTimeString("pt-PT") + ".", "ok");
+        els.refreshBtn.disabled = false;
+        renderTable();
+      }).catch(function (e) {
+        console.error(e);
+        setStatus("Não foi possível ir buscar os preços: " + e.message, "err");
+        els.refreshBtn.disabled = false;
       });
-      state.priceMap = priceMap;
-      state.volMap = volMap;
-      state.lastFetch = new Date();
-      setStatus("Atualizado às " + state.lastFetch.toLocaleTimeString("pt-PT") + ".", "ok");
-      els.refreshBtn.disabled = false;
-      renderTable();
-    }).catch(function (e) {
-      console.error(e);
-      setStatus("Não foi possível ir buscar os preços. Tenta novamente.", "err");
-      els.refreshBtn.disabled = false;
-    });
-  }
-
-  function setStatus(msg, cls) {
-    els.statusLine.textContent = msg;
-    els.statusLine.className = "status-line" + (cls ? " " + cls : "");
+    } catch (err) {
+      console.error(err);
+      setStatus("Erro ao iniciar a atualização: " + err.message, "err");
+      if (els.refreshBtn) els.refreshBtn.disabled = false;
+    }
   }
 
   // ---------- calculation ----------
@@ -426,7 +439,13 @@
     });
   });
 
-  els.refreshBtn.addEventListener("click", loadData);
+  els.refreshBtn.addEventListener("click", function () {
+    try { loadData(); } catch (err) {
+      console.error(err);
+      setStatus("Erro ao atualizar: " + err.message, "err");
+      els.refreshBtn.disabled = false;
+    }
+  });
 
   // ---------- init ----------
   renderCityGrid();
