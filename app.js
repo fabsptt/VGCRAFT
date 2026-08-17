@@ -405,7 +405,7 @@
       "<span>T" + item.tier + " · " + (CAT_LABEL[item.cat] || item.cat) + (item.city ? " · bónus em " + item.city : "") + "</span></div></div>" +
       "<ul class=\"detail-mats\">" + matsHtml + "</ul>" +
       '<div class="detail-grid">' +
-      "<div><span>Cidade de fabrico</span><b>" + useCity + "</b></div>" +
+      "<div><span>Cidade de entrega</span><b>" + useCity + "</b></div>" +
       "<div><span>Retorno de recursos</span><b>" + (rrr * 100).toFixed(1) + "%</b></div>" +
       "<div><span>Preço de venda</span><b>" + fmtSilver(sell) + "</b></div>" +
       "<div><span>Imposto de venda</span><b>" + (state.tax * 100).toFixed(0) + "%</b></div>" +
