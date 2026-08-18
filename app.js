@@ -53,18 +53,6 @@
     els[id] = document.getElementById(id);
   });
 
-  function setStatus(msg, cls) {
-    if (!els.statusLine) return;
-    els.statusLine.textContent = msg;
-    els.statusLine.className = "status-line" + (cls ? " " + cls : "");
-  }
-
-  // rede de segurança: mostra qualquer erro na frase de estado em vez de falhar em silêncio
-  window.addEventListener("error", function (e) {
-    setStatus("Erro no site: " + (e.message || "desconhecido") + " (linha " + e.lineno + ")", "err");
-    if (els.refreshBtn) els.refreshBtn.disabled = false;
-  });
-
   var state = {
     tiers: new Set([4, 5]),
     category: "all",
@@ -204,7 +192,22 @@
         state.priceMap = priceMap;
         state.volMap = volMap;
         state.lastFetch = new Date();
-        setStatus("Atualizado às " + state.lastFetch.toLocaleTimeString("pt-PT") + ".", "ok");
+
+        // diagnóstico: quantos ids pedidos vieram mesmo com preço, no total e só os encantados (@)
+        var gotAny = 0, gotEnchant = 0, totalEnchant = 0;
+        ids.outIds.forEach(function (id) {
+          var isEnchant = id.indexOf("@") !== -1;
+          if (isEnchant) totalEnchant++;
+          var hasPrice = priceMap[id] && Object.keys(priceMap[id]).some(function (c) { return priceMap[id][c].sell_price_min > 0; });
+          if (hasPrice) { gotAny++; if (isEnchant) gotEnchant++; }
+        });
+
+        setStatus(
+          "Atualizado às " + state.lastFetch.toLocaleTimeString("pt-PT") + ". " +
+          "Preços encontrados: " + gotAny + " de " + ids.outIds.length + " variantes de item " +
+          "(encantadas .1–.4: " + gotEnchant + " de " + totalEnchant + ").",
+          "ok"
+        );
         els.refreshBtn.disabled = false;
         renderTable();
       }).catch(function (e) {
@@ -217,6 +220,11 @@
       setStatus("Erro ao iniciar a atualização: " + err.message, "err");
       if (els.refreshBtn) els.refreshBtn.disabled = false;
     }
+  }
+
+  function setStatus(msg, cls) {
+    els.statusLine.textContent = msg;
+    els.statusLine.className = "status-line" + (cls ? " " + cls : "");
   }
 
   // ---------- calculation ----------
@@ -405,7 +413,7 @@
       "<span>T" + item.tier + " · " + (CAT_LABEL[item.cat] || item.cat) + (item.city ? " · bónus em " + item.city : "") + "</span></div></div>" +
       "<ul class=\"detail-mats\">" + matsHtml + "</ul>" +
       '<div class="detail-grid">' +
-      "<div><span>Cidade de entrega</span><b>" + useCity + "</b></div>" +
+      "<div><span>Cidade de fabrico</span><b>" + useCity + "</b></div>" +
       "<div><span>Retorno de recursos</span><b>" + (rrr * 100).toFixed(1) + "%</b></div>" +
       "<div><span>Preço de venda</span><b>" + fmtSilver(sell) + "</b></div>" +
       "<div><span>Imposto de venda</span><b>" + (state.tax * 100).toFixed(0) + "%</b></div>" +
@@ -439,13 +447,7 @@
     });
   });
 
-  els.refreshBtn.addEventListener("click", function () {
-    try { loadData(); } catch (err) {
-      console.error(err);
-      setStatus("Erro ao atualizar: " + err.message, "err");
-      els.refreshBtn.disabled = false;
-    }
-  });
+  els.refreshBtn.addEventListener("click", loadData);
 
   // ---------- init ----------
   renderCityGrid();
