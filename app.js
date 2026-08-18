@@ -60,7 +60,7 @@
     city: "best",
     sort: "profit",
     tax: 0.04,
-    onlyPositive: true,
+    onlyPositive: false,
     fetchVolume: true,
     priceMap: {},   // itemId -> city -> {sell_price_min, sell_price_min_date}
     volMap: {},     // itemId -> city -> count
