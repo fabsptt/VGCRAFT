@@ -243,20 +243,21 @@
   function computeAtCity(item, lvl, req, city) {
     var rrr = (item.city === city) ? RRR_BONUS : RRR_BASE;
     var cost = 0;
-    var complete = true;
+    var costComplete = true;
     req.m.forEach(function (m) {
       var p = priceOf(m.id, city);
-      if (p === null) { complete = false; return; }
+      if (p === null) { costComplete = false; return; }
       cost += m.count * (1 - rrr) * p;
     });
     var outId = lvl === 0 ? item.id : item.id + "@" + lvl;
     var sell = priceOf(outId, city);
-    if (!complete || sell === null) return null;
+    if (sell === null) return null; // sem preço de venda, não há nada a mostrar
+    var finalCost = costComplete ? cost : null;
     var revenue = sell * (1 - state.tax);
-    var profit = revenue - cost;
-    var margin = revenue > 0 ? profit / revenue : null;
+    var profit = finalCost !== null ? revenue - finalCost : null;
+    var margin = (profit !== null && revenue > 0) ? profit / revenue : null;
     var vol = els.fetchVolume.checked ? volOf(item.id, city) : null;
-    return { city: city, sell: sell, cost: cost, profit: profit, margin: margin, vol: vol, rrr: rrr };
+    return { city: city, sell: sell, cost: finalCost, profit: profit, margin: margin, vol: vol, rrr: rrr, costComplete: costComplete };
   }
 
   function buildRows() {
@@ -279,18 +280,22 @@
 
         if (state.city !== "best") {
           var r = computeAtCity(item, lvl, req, state.city);
-          if (r) rows.push(makeRow(item, lvl, r));
-          else if (!state.onlyPositive) rows.push(makeRow(item, lvl, { city: state.city, sell: null, cost: null, profit: null, margin: null, vol: null }));
+          if (r && (r.costComplete || !state.onlyPositive)) rows.push(makeRow(item, lvl, r));
           return;
         }
 
-        var best = null;
+        var candidates = [];
         CITIES.forEach(function (city) {
           var r = computeAtCity(item, lvl, req, city);
-          if (r && (best === null || r.profit > best.profit)) best = r;
+          if (r && (r.costComplete || !state.onlyPositive)) candidates.push(r);
         });
-        if (best) rows.push(makeRow(item, lvl, best));
-        else if (!state.onlyPositive) rows.push(makeRow(item, lvl, { city: null, sell: null, cost: null, profit: null, margin: null, vol: null }));
+        if (candidates.length === 0) return;
+        var best = candidates.reduce(function (a, b) {
+          var av = a.profit === null ? -Infinity : a.profit;
+          var bv = b.profit === null ? -Infinity : b.profit;
+          return bv > av ? b : a;
+        });
+        rows.push(makeRow(item, lvl, best));
       });
     });
     return rows;
@@ -356,7 +361,7 @@
         '<td><div class="item-cell"><img class="item-icon" loading="lazy" src="' + iconUrl(outId) + '" alt=""><div><span class="item-name">' + item.name + " " + enchantTag + '</span><span class="item-sub">T' + item.tier + " · " + (CAT_LABEL[item.cat] || item.cat) + "</span></div></div></td>" +
         "<td>" + cityHtml + "</td>" +
         '<td class="num num-mono">' + fmtSilver(r.sell) + "</td>" +
-        '<td class="num num-mono">' + fmtSilver(r.cost) + "</td>" +
+        '<td class="num num-mono" title="' + (r.costComplete ? "" : "falta o preço de um dos materiais no mercado") + '">' + (r.costComplete ? fmtSilver(r.cost) : "sem material") + "</td>" +
         '<td class="num num-mono ' + profitCls + '">' + fmtSilver(r.profit) + "</td>" +
         '<td class="num num-mono ' + profitCls + '">' + fmtPct(r.margin) + "</td>" +
         '<td class="num num-mono">' + fmtVol(r.vol) + "</td>" +
