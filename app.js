@@ -126,6 +126,13 @@
         req.m.forEach(function (m) { matIds.add(m.id); });
       }
     });
+    // recursos base necessários para estimar a cadeia de encantamento (minério/couro/fibra/
+    // madeira em bruto, e as barras/couro/pano/tábua não-encantados de cada tier, usados como
+    // "prevbar" em T4_METALBAR_LEVELx etc.) — não são material direto de nenhuma receita, por
+    // isso têm de ser pedidos à parte.
+    ["ORE", "HIDE", "FIBER", "WOOD", "METALBAR", "LEATHER", "CLOTH", "PLANKS"].forEach(function (type) {
+      for (var t = 3; t <= 8; t++) matIds.add("T" + t + "_" + type);
+    });
     return { outIds: Array.from(outIds), matIds: Array.from(matIds), baseIds: Array.from(baseIds) };
   }
 
