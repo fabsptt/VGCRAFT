@@ -19,8 +19,8 @@
   <div class="masthead-inner">
     <p class="eyebrow">Servidor Europa · Registo de Mercado</p>
     <picture>
-      <source srcset="banner.webp" type="image/webp">
-      <img class="banner-img" src="banner.png" alt="Velha Guarda — Crafting Manager. Bónus de Refinação +40% (Madeira em Fort Sterling, Fibra em Lymhurst, Pedra em Bridgewatch, Couro em Martlock, Minério em Thetford). Bónus de Fabrico +15% por cidade e categoria de item.">
+      <source srcset="assets/banner.webp" type="image/webp">
+      <img class="banner-img" src="assets/banner.png" alt="Velha Guarda — Crafting Manager. Bónus de Refinação +40% (Madeira em Fort Sterling, Fibra em Lymhurst, Pedra em Bridgewatch, Couro em Martlock, Minério em Thetford). Bónus de Fabrico +15% por cidade e categoria de item.">
     </picture>
     <p class="tagline">O que compensa fabricar agora — e em que cidade vender.</p>
   </div>
@@ -45,6 +45,11 @@
       <div class="field">
         <label for="categorySel">Categoria</label>
         <select id="categorySel"></select>
+      </div>
+
+      <div class="field" id="subcatField" hidden>
+        <label for="subcatSel">Subcategoria</label>
+        <select id="subcatSel"></select>
       </div>
 
       <div class="field">

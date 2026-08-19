@@ -36,6 +36,22 @@
     cape: "Capa", bag: "Bolsa", tool: "Ferramenta", consumable: "Consumível"
   };
 
+  // subcategorias por categoria — chave = valor de "sub" nos dados, valor = rótulo em PT
+  var SUBCAT_LABEL = {
+    weapon: {
+      sword: "Espada", axe: "Machado", mace: "Maça", hammer: "Martelo", spear: "Lança",
+      dagger: "Adaga", knuckles: "Manoplas", bow: "Arco", crossbow: "Besta",
+      quarterstaff: "Bastão (Quarterstaff)", arcanestaff: "Cajado Arcano",
+      cursestaff: "Cajado Amaldiçoado", firestaff: "Cajado de Fogo", froststaff: "Cajado de Gelo",
+      holystaff: "Cajado Sagrado", naturestaff: "Cajado da Natureza"
+    },
+    head: { plate_helmet: "Placas", leather_helmet: "Couro", cloth_helmet: "Pano" },
+    chest: { plate_armor: "Placas", leather_armor: "Couro", cloth_armor: "Pano" },
+    shoes: { plate_shoes: "Placas", leather_shoes: "Couro", cloth_shoes: "Pano" },
+    offhand: { shieldtype: "Escudo", booktype: "Livro", torchtype: "Tocha" },
+    tool: { ore: "Picareta (Minério)", rock: "Martelo (Pedra)", wood: "Machado (Madeira)", fiber: "Foice (Fibra)", hide: "Faca (Couro)", fish: "Cana de Pesca" }
+  };
+
   var BONUS_INFO = [
     { city: "Fort Sterling", refine: "Madeira", craft: "Martelo, Lança, Cajado Sagrado, Peitoral de Pano, Elmo de Placas" },
     { city: "Lymhurst", refine: "Fibra", craft: "Espada, Arco, Cajado Arcano, Elmo de Couro, Botas de Couro" },
@@ -47,7 +63,7 @@
   ];
 
   var els = {};
-  ["tierChips", "categorySel", "enchantSel", "citySel", "sortSel", "taxSeg",
+  ["tierChips", "categorySel", "subcatField", "subcatSel", "enchantSel", "citySel", "sortSel", "taxSeg",
    "onlyPositive", "fetchVolume", "refreshBtn", "statusLine", "resultsBody",
    "cityGrid", "detailPanel", "detailBody", "detailClose"].forEach(function (id) {
     els[id] = document.getElementById(id);
@@ -56,6 +72,7 @@
   var state = {
     tiers: new Set([4, 5]),
     category: "all",
+    subcat: "all",
     enchant: "all",
     city: "best",
     sort: "profit",
@@ -102,6 +119,24 @@
     els.categorySel.innerHTML = CATEGORY_FILTERS.map(function (c) {
       return '<option value="' + c.key + '">' + c.label + "</option>";
     }).join("");
+  }
+
+  // popula (ou esconde) o dropdown de subcategoria consoante a categoria escolhida
+  function renderSubcatSelect() {
+    var map = SUBCAT_LABEL[state.category];
+    if (!map) {
+      els.subcatField.hidden = true;
+      state.subcat = "all";
+      return;
+    }
+    els.subcatField.hidden = false;
+    var keys = Object.keys(map);
+    // ordena pelo rótulo em PT, mantém "Todas" no topo
+    keys.sort(function (a, b) { return map[a].localeCompare(map[b], "pt"); });
+    els.subcatSel.innerHTML = '<option value="all">Todas</option>' +
+      keys.map(function (k) { return '<option value="' + k + '">' + map[k] + "</option>"; }).join("");
+    els.subcatSel.value = "all";
+    state.subcat = "all";
   }
 
   // ---------- fetching ----------
@@ -339,6 +374,7 @@
         else if (catFilter === "potion" && !(item.cat === "consumable" && item.sub === "potions")) return;
         else if (catFilter !== "food" && catFilter !== "potion" && item.cat !== catFilter) return;
       }
+      if (state.subcat !== "all" && item.sub !== state.subcat) return;
 
       var levels = enchantFilter === "all" ? [0, 1, 2, 3, 4] : [parseInt(enchantFilter, 10)];
       levels.forEach(function (lvl) {
@@ -506,7 +542,12 @@
 
   // ---------- wire up controls ----------
 
-  els.categorySel.addEventListener("change", function () { state.category = els.categorySel.value; renderTable(); });
+  els.categorySel.addEventListener("change", function () {
+    state.category = els.categorySel.value;
+    renderSubcatSelect();
+    renderTable();
+  });
+  els.subcatSel.addEventListener("change", function () { state.subcat = els.subcatSel.value; renderTable(); });
   els.enchantSel.addEventListener("change", function () { state.enchant = els.enchantSel.value; renderTable(); });
   els.citySel.addEventListener("change", function () { state.city = els.citySel.value; renderTable(); });
   els.sortSel.addEventListener("change", function () { state.sort = els.sortSel.value; renderTable(); });
@@ -528,4 +569,5 @@
   renderTierChips();
   renderCategorySelect();
   state.category = els.categorySel.value;
+  renderSubcatSelect();
 })();
