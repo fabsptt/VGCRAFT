@@ -229,6 +229,64 @@
 
   // ---------- calculation ----------
 
+  // Cadeia de encantamento de recursos (dados reais do jogo, não estimativas às cegas):
+  // para obter um recurso T{n}_{TIPO}_LEVEL{l}, primeiro "transmuta-se" o recurso em bruto
+  // (custa prata fixa + o recurso em bruto normal), depois refina-se com o recurso em bruto
+  // encantado + 1 barra/couro/pano/tábua da tier anterior no MESMO nível de encantamento.
+  var RAW_OF_REFINED = { METALBAR: "ORE", LEATHER: "HIDE", CLOTH: "FIBER", PLANKS: "WOOD" };
+  var REFINE_BONUS_CITY = { ORE: "Thetford", HIDE: "Martlock", FIBER: "Lymhurst", WOOD: "Fort Sterling" };
+  var RRR_REFINE_BASE = 0.152;
+  var RRR_REFINE_BONUS = 0.367;
+  var RAW_COUNT_BY_TIER = { 4: 2, 5: 3, 6: 4, 7: 5, 8: 5 };
+  // taxa de prata (silver) de cada passo de transmutação, por tier e nível — igual para os 4 tipos de recurso
+  var TRANSMUTE_FEE = {
+    4: [1500, 3000, 6000, 24000],
+    5: [1563, 3125, 6250, 25000],
+    6: [2500, 5000, 16500, 66000],
+    7: [5000, 15750, 51975, 207900],
+    8: [15000, 47250, 155925, 779625]
+  };
+
+  var ENCHANT_RESOURCE_RE = /^T(\d)_(METALBAR|LEATHER|CLOTH|PLANKS|ORE|HIDE|FIBER|WOOD)_LEVEL(\d)$/;
+
+  // custo estimado de 1 unidade de recurso em bruto encantado (ex.: T6_ORE_LEVEL2), recursivo
+  function estimateRawEnchant(type, tier, level, city) {
+    if (level === 0) return priceOf("T" + tier + "_" + type, city);
+    var prev = level === 1 ? priceOf("T" + tier + "_" + type, city) : estimateRawEnchant(type, tier, level - 1, city);
+    if (prev === null) return null;
+    var fee = TRANSMUTE_FEE[tier][level - 1];
+    return prev + fee; // transmutação não tem retorno de recursos (consome 100%)
+  }
+
+  // custo estimado de 1 unidade de recurso refinado encantado (ex.: T6_METALBAR_LEVEL2), recursivo pelas tiers
+  function estimateRefinedEnchant(refined, tier, level, city) {
+    if (level === 0) return priceOf("T" + tier + "_" + refined, city);
+    var type = RAW_OF_REFINED[refined];
+    var rawCost = estimateRawEnchant(type, tier, level, city);
+    var prevBarCost = tier === 4
+      ? priceOf("T3_" + refined, city)
+      : estimateRefinedEnchant(refined, tier - 1, level, city);
+    if (rawCost === null || prevBarCost === null) return null;
+    var rrr = (city === REFINE_BONUS_CITY[type]) ? RRR_REFINE_BONUS : RRR_REFINE_BASE;
+    var count = RAW_COUNT_BY_TIER[tier];
+    return (count * rawCost + prevBarCost) * (1 - rrr);
+  }
+
+  // preço de um material: primeiro tenta o mercado; se faltar E for um recurso encantado
+  // (metal/couro/pano/tábua ou o seu recurso em bruto), calcula o custo real da cadeia de
+  // encantamento a partir dos preços de mercado dos recursos base. Devolve {value, estimated}.
+  function materialPrice(id, city) {
+    var real = priceOf(id, city);
+    if (real !== null) return { value: real, estimated: false };
+    var m = id.match(ENCHANT_RESOURCE_RE);
+    if (!m) return null;
+    var tier = parseInt(m[1], 10), type = m[2], level = parseInt(m[3], 10);
+    var est = RAW_OF_REFINED[type]
+      ? estimateRefinedEnchant(type, tier, level, city)
+      : estimateRawEnchant(type, tier, level, city);
+    return est === null ? null : { value: est, estimated: true };
+  }
+
   function priceOf(id, city) {
     var e = state.priceMap[id] && state.priceMap[id][city];
     if (!e || !e.sell_price_min) return null;
@@ -244,10 +302,12 @@
     var rrr = (item.city === city) ? RRR_BONUS : RRR_BASE;
     var cost = 0;
     var costComplete = true;
+    var costEstimated = false;
     req.m.forEach(function (m) {
-      var p = priceOf(m.id, city);
+      var p = materialPrice(m.id, city);
       if (p === null) { costComplete = false; return; }
-      cost += m.count * (1 - rrr) * p;
+      if (p.estimated) costEstimated = true;
+      cost += m.count * (1 - rrr) * p.value;
     });
     var outId = lvl === 0 ? item.id : item.id + "@" + lvl;
     var sell = priceOf(outId, city);
@@ -257,7 +317,7 @@
     var profit = finalCost !== null ? revenue - finalCost : null;
     var margin = (profit !== null && revenue > 0) ? profit / revenue : null;
     var vol = els.fetchVolume.checked ? volOf(item.id, city) : null;
-    return { city: city, sell: sell, cost: finalCost, profit: profit, margin: margin, vol: vol, rrr: rrr, costComplete: costComplete };
+    return { city: city, sell: sell, cost: finalCost, profit: profit, margin: margin, vol: vol, rrr: rrr, costComplete: costComplete, costEstimated: costEstimated };
   }
 
   function buildRows() {
@@ -361,7 +421,7 @@
         '<td><div class="item-cell"><img class="item-icon" loading="lazy" src="' + iconUrl(outId) + '" alt=""><div><span class="item-name">' + item.name + " " + enchantTag + '</span><span class="item-sub">T' + item.tier + " · " + (CAT_LABEL[item.cat] || item.cat) + "</span></div></div></td>" +
         "<td>" + cityHtml + "</td>" +
         '<td class="num num-mono">' + fmtSilver(r.sell) + "</td>" +
-        '<td class="num num-mono" title="' + (r.costComplete ? "" : "falta o preço de um dos materiais no mercado") + '">' + (r.costComplete ? fmtSilver(r.cost) : "sem material") + "</td>" +
+        '<td class="num num-mono" title="' + (r.costEstimated ? "custo com estimativa da cadeia de encantamento (recurso encantado sem venda ativa no mercado)" : "") + '">' + (r.costComplete ? (r.costEstimated ? "≈" : "") + fmtSilver(r.cost) : "sem material") + "</td>" +
         '<td class="num num-mono ' + profitCls + '">' + fmtSilver(r.profit) + "</td>" +
         '<td class="num num-mono ' + profitCls + '">' + fmtPct(r.margin) + "</td>" +
         '<td class="num num-mono">' + fmtVol(r.vol) + "</td>" +
@@ -391,22 +451,24 @@
 
     var matsHtml = req.m.map(function (m) {
       var eff = m.count * (1 - rrr);
-      var price = priceOf(m.id, useCity);
-      var subtotal = price !== null ? eff * price : null;
+      var p = materialPrice(m.id, useCity);
+      var subtotal = p !== null ? eff * p.value : null;
       var mname = window.MATERIALS[m.id] || m.id;
+      var tag = p !== null && p.estimated ? " (estimado)" : "";
       return (
         "<li><span>" + mname + " — " + m.count + " (efetivo " + eff.toFixed(1) + ")</span>" +
-        "<b>" + (price !== null ? fmtSilver(price) + " → " + fmtSilver(subtotal) : "sem preço") + "</b></li>"
+        "<b>" + (p !== null ? fmtSilver(p.value) + tag + " → " + fmtSilver(subtotal) : "sem preço") + "</b></li>"
       );
     }).join("");
 
     var sell = priceOf(outId, useCity);
-    var cost = null, complete = true;
+    var cost = null, complete = true, anyEstimated = false;
     var costSum = 0;
     req.m.forEach(function (m) {
-      var p = priceOf(m.id, useCity);
+      var p = materialPrice(m.id, useCity);
       if (p === null) { complete = false; return; }
-      costSum += m.count * (1 - rrr) * p;
+      if (p.estimated) anyEstimated = true;
+      costSum += m.count * (1 - rrr) * p.value;
     });
     cost = complete ? costSum : null;
     var revenue = sell !== null ? sell * (1 - state.tax) : null;
@@ -422,7 +484,7 @@
       "<div><span>Retorno de recursos</span><b>" + (rrr * 100).toFixed(1) + "%</b></div>" +
       "<div><span>Preço de venda</span><b>" + fmtSilver(sell) + "</b></div>" +
       "<div><span>Imposto de venda</span><b>" + (state.tax * 100).toFixed(0) + "%</b></div>" +
-      "<div><span>Custo de materiais</span><b>" + fmtSilver(cost) + "</b></div>" +
+      "<div><span>Custo de materiais</span><b>" + (anyEstimated ? "≈" : "") + fmtSilver(cost) + "</b></div>" +
       "<div><span>Foco necessário</span><b>" + fmtSilver(req.f) + "</b></div>" +
       "<div><span>Lucro estimado</span><b>" + fmtSilver(profit) + "</b></div>" +
       "<div><span>Item Power</span><b>" + (item.ip || "—") + "</b></div>" +
