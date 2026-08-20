@@ -43,7 +43,7 @@
       dagger: "Adaga", knuckles: "Manoplas", bow: "Arco", crossbow: "Besta",
       quarterstaff: "Bastão (Quarterstaff)", arcanestaff: "Cajado Arcano",
       cursestaff: "Cajado Amaldiçoado", firestaff: "Cajado de Fogo", froststaff: "Cajado de Gelo",
-      holystaff: "Cajado Sagrado", naturestaff: "Cajado da Natureza"
+      holystaff: "Cajado Sagrado", naturestaff: "Cajado da Natureza", shapeshifterstaff: "Cajado Metamorfo"
     },
     head: { plate_helmet: "Placas", leather_helmet: "Couro", cloth_helmet: "Pano" },
     chest: { plate_armor: "Placas", leather_armor: "Couro", cloth_armor: "Pano" },
@@ -58,8 +58,8 @@
     { city: "Bridgewatch", refine: "Pedra", craft: "Besta, Adaga, Cajado Amaldiçoado, Peitoral de Placas, Botas de Pano" },
     { city: "Martlock", refine: "Couro (Hide)", craft: "Machado, Quarterstaff, Cajado de Gelo, Botas de Placas, todos os Offhands" },
     { city: "Thetford", refine: "Minério", craft: "Maça, Cajado da Natureza, Cajado de Fogo, Peitoral de Couro, Elmo de Pano" },
-    { city: "Caerleon", refine: "—", craft: "Ferramentas de recoleta, Comida, Poções, Manoplas de Guerra" },
-    { city: "Brecilien", refine: "—", craft: "Capas, Bolsas" }
+    { city: "Caerleon", refine: "—", craft: "Ferramentas de Coleta, Roupa Coleta,  Comida, Manoplas de Guerra, Cajado de Metamorfo " },
+    { city: "Brecilien", refine: "—", craft: "Capas, Bolsas, Poções" }
   ];
 
   var els = {};
@@ -523,7 +523,7 @@
       "<span>T" + item.tier + " · " + (CAT_LABEL[item.cat] || item.cat) + (item.city ? " · bónus em " + item.city : "") + "</span></div></div>" +
       "<ul class=\"detail-mats\">" + matsHtml + "</ul>" +
       '<div class="detail-grid">' +
-      "<div><span>Cidade de Venda</span><b>" + useCity + "</b></div>" +
+      "<div><span>Cidade de fabrico</span><b>" + useCity + "</b></div>" +
       "<div><span>Retorno de recursos</span><b>" + (rrr * 100).toFixed(1) + "%</b></div>" +
       "<div><span>Preço de venda</span><b>" + fmtSilver(sell) + "</b></div>" +
       "<div><span>Imposto de venda</span><b>" + (state.tax * 100).toFixed(0) + "%</b></div>" +
